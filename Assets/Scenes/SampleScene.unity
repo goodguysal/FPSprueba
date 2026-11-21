@@ -299,7 +299,7 @@ MonoBehaviour:
   barraVida: {fileID: 896556835}
   demoraRegeneracion: 2
   vidaRegeneradaPorSegundo: 6
-  pantallaMuerte: {fileID: 0}
+  pantallaMuerte: {fileID: 2109791994}
   retrasoReinicio: 3
 --- !u!1001 &54479351
 PrefabInstance:
@@ -931,6 +931,7 @@ GameObject:
   m_Component:
   - component: {fileID: 153056691}
   - component: {fileID: 153056690}
+  - component: {fileID: 153056692}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -969,6 +970,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &153056692
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 153056689}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f9e761d0ab06acd45b71a6c44738d8ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::QuitOnEscape
 --- !u!1 &156398928
 GameObject:
   m_ObjectHideFlags: 0
@@ -4493,7 +4506,7 @@ MonoBehaviour:
   distanciaAtaque: 15
   velocidadGiro: 6
   puntoDisparo: {fileID: 1184901284}
-  distanciaDisparo: 69
+  distanciaDisparo: 80
   danioJugador: 10
   segundosEntreDisparos: 0.5
   balasPorCargador: 5
@@ -5541,6 +5554,9 @@ MonoBehaviour:
   tiempoRecarga: 2
   radioExplosion: 9
   danioMaximo: 70
+  fuerzaRetroceso: 1
+  anguloRetroceso: 5
+  velocidadRetorno: 12
 --- !u!1 &701881334
 GameObject:
   m_ObjectHideFlags: 0
@@ -6177,6 +6193,8 @@ MonoBehaviour:
   tiempoRecarga: 1.5
   fuerzaRetroceso: 0.06
   velocidadRetorno: 12
+  inclinacionRecarga: 12
+  velocidadInclinacion: 10
 --- !u!1 &827078365
 GameObject:
   m_ObjectHideFlags: 0
@@ -12914,7 +12932,7 @@ MonoBehaviour:
   distanciaAtaque: 15
   velocidadGiro: 6
   puntoDisparo: {fileID: 1282646414}
-  distanciaDisparo: 69
+  distanciaDisparo: 90
   danioJugador: 10
   segundosEntreDisparos: 0.5
   balasPorCargador: 5

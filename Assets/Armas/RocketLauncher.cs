@@ -26,6 +26,15 @@ public class RocketLauncher : MonoBehaviour
     [SerializeField] private float radioExplosion = 5f;
     [SerializeField] private float danioMaximo = 80f;
 
+    [Header("Retroceso")]
+    [SerializeField] private float fuerzaRetroceso = 0.12f;
+    [SerializeField] private float anguloRetroceso = 7f;
+    [SerializeField] private float velocidadRetorno = 18f;
+
+    private Vector3 posicionInicialArma;
+    private Quaternion rotacionInicialArma;
+    private float retrocesoActual;
+
     private int cohetesEnCargador;
     private int cohetesDeReserva;
     private int cohetesARecargar;
@@ -39,6 +48,10 @@ public class RocketLauncher : MonoBehaviour
     {
         cohetesEnCargador = cohetesPorCargador;
         cohetesDeReserva = Mathf.Clamp(reservaInicial, 0, reservaMaxima);
+
+        posicionInicialArma = transform.localPosition;
+        rotacionInicialArma = transform.localRotation;
+
         ActualizarUI();
     }
 
@@ -48,11 +61,15 @@ public class RocketLauncher : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.R))
             IniciarRecarga();
+
         if (!recargando &&
             Input.GetMouseButtonDown(0) &&
             Time.time >= siguienteDisparo)
         {
-            Disparar();   }
+            Disparar();
+        }
+
+        ActualizarRetroceso();
     }
 
     private void Disparar()
@@ -61,7 +78,8 @@ public class RocketLauncher : MonoBehaviour
         {
             if (cohetesEnCargador <= 0)
                 IniciarRecarga();
-           return;
+
+            return;
         }
 
         if (puntoSalida == null || prefabCohete == null)
@@ -97,16 +115,55 @@ public class RocketLauncher : MonoBehaviour
             transform.root.gameObject);
 
         if (sonidoDisparo != null)
+        {
             AudioSource.PlayClipAtPoint(
                 sonidoDisparo,
                 puntoSalida.position);
+        }
 
         cohetesEnCargador--;
         siguienteDisparo = Time.time + tiempoEntreDisparos;
+
+        // Activa la animación únicamente después de un disparo válido.
+        retrocesoActual = 1f;
+
         ActualizarUI();
 
         if (cohetesEnCargador <= 0)
             IniciarRecarga();
+    }
+
+    private void ActualizarRetroceso()
+    {
+        if (retrocesoActual <= 0f)
+        {
+            retrocesoActual = 0f;
+        }
+        else
+        {
+            retrocesoActual = Mathf.MoveTowards(
+                retrocesoActual,
+                0f,
+                velocidadRetorno * Time.deltaTime);
+        }
+
+        Vector3 posicionObjetivo =
+            posicionInicialArma +
+            Vector3.back * (fuerzaRetroceso * retrocesoActual);
+
+        Quaternion rotacionObjetivo =
+            rotacionInicialArma *
+            Quaternion.Euler(-anguloRetroceso * retrocesoActual, 0f, 0f);
+
+        transform.localPosition = Vector3.Lerp(
+            transform.localPosition,
+            posicionObjetivo,
+            velocidadRetorno * Time.deltaTime);
+
+        transform.localRotation = Quaternion.Slerp(
+            transform.localRotation,
+            rotacionObjetivo,
+            velocidadRetorno * Time.deltaTime);
     }
 
     private void IniciarRecarga()
@@ -162,7 +219,8 @@ public class RocketLauncher : MonoBehaviour
         ActualizarTextoMunicion();
 
         if (progreso >= 1f)
-        {     recargando = false;
+        {
+            recargando = false;
             ActualizarUI();
         }
     }
@@ -173,6 +231,7 @@ public class RocketLauncher : MonoBehaviour
             return false;
 
         int reservaAnterior = cohetesDeReserva;
+
         cohetesDeReserva = Mathf.Min(
             reservaMaxima,
             cohetesDeReserva + cantidad);
@@ -195,7 +254,9 @@ public class RocketLauncher : MonoBehaviour
     private void ActualizarTextoMunicion()
     {
         if (textoMunicion != null)
+        {
             textoMunicion.text =
                 $"{cohetesEnCargador} / {cohetesDeReserva}";
+        }
     }
 }

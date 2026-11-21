@@ -29,7 +29,12 @@ public class WeaponController : MonoBehaviour
     [Header("Retroceso")]
     [SerializeField] private float fuerzaRetroceso = 0.06f;
     [SerializeField] private float velocidadRetorno = 12f;
+    
+    [Header("Inclinación al recargar")]
+    [SerializeField] private float inclinacionRecarga = 12f;
+    [SerializeField] private float velocidadInclinacion = 10f;
 
+    private Quaternion rotacionInicial;
     private int balasEnCargador;
     private int balasDeReserva;
     private int balasARecargar;
@@ -47,6 +52,7 @@ public class WeaponController : MonoBehaviour
         posicionInicial = transform.localPosition;
         balasEnCargador = balasPorCargador;
         balasDeReserva = Mathf.Clamp(reservaInicial, 0, reservaMaxima);
+        rotacionInicial = transform.localRotation;
 
         if (camara == null)
             camara = Camera.main;
@@ -61,6 +67,7 @@ public class WeaponController : MonoBehaviour
     {
         ActualizarRecarga();
         ActualizarRetroceso();
+        ActualizarInclinacionRecarga();
 
         if (Input.GetKeyDown(KeyCode.R))
             IniciarRecarga();
@@ -222,4 +229,18 @@ public class WeaponController : MonoBehaviour
             transform.localPosition,
             posicionObjetivo,
             velocidadRetorno * Time.deltaTime);
-    }}
+
+    }
+    private void ActualizarInclinacionRecarga()
+    {
+        Quaternion rotacionObjetivo = recargando
+            ? rotacionInicial * Quaternion.Euler(0f, 0f, -inclinacionRecarga)
+            : rotacionInicial;
+
+        transform.localRotation = Quaternion.Slerp(
+            transform.localRotation,
+            rotacionObjetivo,
+            velocidadInclinacion * Time.deltaTime);
+    }
+
+}

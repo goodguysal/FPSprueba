@@ -15,13 +15,27 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float recargaPorSegundo = 20f;
     [SerializeField] private Slider barraEnergia;
 
+    [Header("Agacharse")]
+    [SerializeField] private float alturaAgachado = 1.2f;
+    [SerializeField] private float velocidadAgacharse = 8f;
+
     private CharacterController controller;
     private float energiaActual;
+
+    private float alturaDePie;
+    private Vector3 centroDePie;
+    private Vector3 posicionInicialCamara;
 
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
         energiaActual = energiaMaxima;
+
+        alturaDePie = controller.height;
+        centroDePie = controller.center;
+
+        if (camara != null)
+            posicionInicialCamara = camara.localPosition;
 
         if (barraEnergia != null)
         {
@@ -32,6 +46,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
+        ActualizarAgacharse();
+
         float horizontal = Input.GetAxisRaw("Horizontal");
         float vertical = Input.GetAxisRaw("Vertical");
 
@@ -47,7 +63,8 @@ public class PlayerMovement : MonoBehaviour
         Vector3 movimiento = derecha * horizontal + adelante * vertical;
         movimiento = Vector3.ClampMagnitude(movimiento, 1f);
 
-        bool usandoDash = Input.GetKey(KeyCode.LeftShift) && energiaActual > 0f;
+        bool usandoDash =
+            Input.GetKey(KeyCode.LeftShift) && energiaActual > 0f;
 
         if (usandoDash)
             energiaActual -= consumoPorSegundo * Time.deltaTime;
@@ -61,5 +78,33 @@ public class PlayerMovement : MonoBehaviour
 
         if (barraEnergia != null)
             barraEnergia.value = energiaActual;
+    }
+
+    private void ActualizarAgacharse()
+    {
+        bool agachado =
+            Input.GetKey(KeyCode.LeftControl) ||
+            Input.GetKey(KeyCode.RightControl);
+
+        float alturaObjetivo = agachado
+            ? Mathf.Max(alturaAgachado, controller.radius * 2f)
+            : alturaDePie;
+
+        controller.height = Mathf.Lerp(
+            controller.height,
+            alturaObjetivo,
+            velocidadAgacharse * Time.deltaTime);
+
+        // Ajusta el centro para que los pies permanezcan en el mismo sitio.
+        float diferenciaAltura = alturaDePie - controller.height;
+        Vector3 centro = centroDePie;
+        centro.y -= diferenciaAltura * 0.5f;
+        controller.center = centro;
+
+        if (camara != null)
+        {
+            camara.localPosition = posicionInicialCamara
+                + Vector3.down * (diferenciaAltura * 0.5f);
+        }
     }
 }

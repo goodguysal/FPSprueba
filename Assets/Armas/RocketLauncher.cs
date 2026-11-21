@@ -49,7 +49,7 @@ public class RocketLauncher : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.R))
             IniciarRecarga();
         if (!recargando &&
-            Input.GetButtonDown("Fire1") &&
+            Input.GetMouseButtonDown(0) &&
             Time.time >= siguienteDisparo)
         {
             Disparar();   }

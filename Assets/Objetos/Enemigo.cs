@@ -14,6 +14,7 @@ public class Enemigo : MonoBehaviour
     [Header("Vida")]
     [SerializeField] private float vidaMaxima = 100f;
     [SerializeField] private Slider barraVida;
+    private bool muerto;
 
     [Header("Patrulla")]
     [SerializeField] private Transform[] puntosPatrulla;
@@ -482,11 +483,8 @@ public class Enemigo : MonoBehaviour
 
     public void RecibirDanio(float cantidad, Transform atacante)
     {
-        if (cantidad <= 0f || vidaActual <= 0f)
-            return;
-
-        // Registra al jugador y cancela la espera de patrulla.
-        if (atacante != null)
+        if (muerto || cantidad <= 0f)
+            return; if (atacante != null)
         {
             jugador = atacante.root;
             esperando = false;
@@ -499,7 +497,14 @@ public class Enemigo : MonoBehaviour
         ActualizarBarraVida();
 
         if (vidaActual <= 0f)
+        {
+            muerto = true;
+
+            if (VictoryManager.Instance != null)
+                VictoryManager.Instance.RegistrarEnemigoEliminado();
+
             Destroy(gameObject);
+        }
     }
 
     private void ActualizarBarraVida()

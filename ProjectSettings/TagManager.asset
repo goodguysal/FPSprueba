@@ -5,6 +5,9 @@ TagManager:
   serializedVersion: 3
   tags:
   - OneWayDoor
+  - FxTemporaire
+  - HabitacionActual
+  - Enemigo
   layers:
   - Default
   - TransparentFX

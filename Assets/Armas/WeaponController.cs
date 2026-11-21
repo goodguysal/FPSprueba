@@ -1,3 +1,4 @@
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -87,10 +88,10 @@ public class WeaponController : MonoBehaviour
 
         // Este raycast ocurre únicamente una vez por clic.
         if (Physics.Raycast(
-            camara.transform.position,
-            camara.transform.forward,
-            out RaycastHit impacto,
-            distancia))
+      camara.transform.position,
+      camara.transform.forward,
+      out RaycastHit impacto,
+      distancia))
         {
             if (efectoImpacto != null)
             {
@@ -98,6 +99,11 @@ public class WeaponController : MonoBehaviour
                     efectoImpacto,
                     impacto.point,
                     Quaternion.LookRotation(impacto.normal));
+
+                Enemigo enemigo = impacto.collider.GetComponentInParent<Enemigo>();
+
+                if (enemigo != null)
+                    enemigo.RecibirDanio(danio);
             }
 
             impacto.collider.SendMessage(
@@ -142,6 +148,8 @@ public class WeaponController : MonoBehaviour
             recargando = false;
             ActualizarBarra();
         }
+
+      
     }
 
     private void ActualizarBarra()

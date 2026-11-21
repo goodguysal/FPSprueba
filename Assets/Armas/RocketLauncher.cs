@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class RocketLauncher : MonoBehaviour
 {
@@ -7,6 +8,7 @@ public class RocketLauncher : MonoBehaviour
     [SerializeField] private Transform puntoSalida;
     [SerializeField] private GameObject prefabCohete;
     [SerializeField] private Slider barraCarga;
+    [SerializeField] private TMP_Text textoMunicion;
     [SerializeField] private AudioClip sonidoDisparo;
 
     [Header("Disparo")]
@@ -14,61 +16,59 @@ public class RocketLauncher : MonoBehaviour
     [SerializeField] private float distanciaMaxima = 80f;
     [SerializeField] private float tiempoEntreDisparos = 0.8f;
 
-    [Header("Cargador y recarga")]
+    [Header("Munición")]
     [SerializeField] private int cohetesPorCargador = 4;
+    [SerializeField] private int reservaInicial = 8;
+    [SerializeField] private int reservaMaxima = 20;
     [SerializeField] private float tiempoRecarga = 2f;
 
     [Header("Explosión")]
     [SerializeField] private float radioExplosion = 5f;
-    [SerializeField] private float danioMaximo = 100f;
+    [SerializeField] private float danioMaximo = 80f;
 
-    private int cohetesRestantes;
+    private int cohetesEnCargador;
+    private int cohetesDeReserva;
+    private int cohetesARecargar;
+    private int cohetesTransferidos;
+
     private float siguienteDisparo;
     private float progresoRecarga;
     private bool recargando;
 
     private void Start()
     {
-        cohetesRestantes = cohetesPorCargador;
-        ActualizarBarra();
+        cohetesEnCargador = cohetesPorCargador;
+        cohetesDeReserva = Mathf.Clamp(reservaInicial, 0, reservaMaxima);
+        ActualizarUI();
     }
 
     private void Update()
     {
         ActualizarRecarga();
 
-        if (recargando)
-            return;
-
-        if (Input.GetKeyDown(KeyCode.R) &&
-            cohetesRestantes < cohetesPorCargador)
-        {
+        if (Input.GetKeyDown(KeyCode.R))
             IniciarRecarga();
-            return;
-        }
-
-        // Dispara una sola vez por clic, no mientras se mantiene pulsado.
-        if (Input.GetButtonDown("Fire1") && Time.time >= siguienteDisparo)
-            Disparar();
+        if (!recargando &&
+            Input.GetButtonDown("Fire1") &&
+            Time.time >= siguienteDisparo)
+        {
+            Disparar();   }
     }
 
     private void Disparar()
     {
-        if (cohetesRestantes <= 0)
+        if (recargando || cohetesEnCargador <= 0)
         {
-            IniciarRecarga();
-            return;
+            if (cohetesEnCargador <= 0)
+                IniciarRecarga();
+           return;
         }
 
-        if (puntoSalida == null)
+        if (puntoSalida == null || prefabCohete == null)
         {
-            Debug.LogError("RocketLauncher: asigna Punto Salida en el Inspector.", this);
-            return;
-        }
-
-        if (prefabCohete == null)
-        {
-            Debug.LogError("RocketLauncher: asigna Prefab Cohete en el Inspector.", this);
+            Debug.LogError(
+                "RocketLauncher: asigna Punto Salida y Prefab Cohete.",
+                this);
             return;
         }
 
@@ -83,7 +83,7 @@ public class RocketLauncher : MonoBehaviour
         if (proyectil == null)
         {
             Debug.LogError(
-                "El prefab del cohete necesita el componente RocketProjectile.",
+                "El prefab necesita el componente RocketProjectile.",
                 nuevoCohete);
             Destroy(nuevoCohete);
             return;
@@ -97,25 +97,34 @@ public class RocketLauncher : MonoBehaviour
             transform.root.gameObject);
 
         if (sonidoDisparo != null)
-            AudioSource.PlayClipAtPoint(sonidoDisparo, transform.position, 3f);
-        else
-            Debug.LogWarning("RocketLauncher: asigna Sonido Disparo en el Inspector.", this);
+            AudioSource.PlayClipAtPoint(
+                sonidoDisparo,
+                puntoSalida.position);
 
-        cohetesRestantes--;
+        cohetesEnCargador--;
         siguienteDisparo = Time.time + tiempoEntreDisparos;
-        ActualizarBarra();
+        ActualizarUI();
 
-        if (cohetesRestantes <= 0)
+        if (cohetesEnCargador <= 0)
             IniciarRecarga();
     }
 
     private void IniciarRecarga()
     {
-        if (recargando || cohetesRestantes >= cohetesPorCargador)
+        if (recargando ||
+            cohetesEnCargador >= cohetesPorCargador ||
+            cohetesDeReserva <= 0)
+        {
             return;
+        }
 
-        recargando = true;
+        cohetesARecargar = Mathf.Min(
+            cohetesPorCargador - cohetesEnCargador,
+            cohetesDeReserva);
+
+        cohetesTransferidos = 0;
         progresoRecarga = 0f;
+        recargando = true;
     }
 
     private void ActualizarRecarga()
@@ -129,29 +138,64 @@ public class RocketLauncher : MonoBehaviour
 
         float progreso = Mathf.Clamp01(progresoRecarga);
 
+        int transferidosAhora =
+            Mathf.FloorToInt(cohetesARecargar * progreso);
+
+        int nuevosCohetes = transferidosAhora - cohetesTransferidos;
+
+        if (nuevosCohetes > 0)
+        {
+            cohetesEnCargador += nuevosCohetes;
+            cohetesDeReserva -= nuevosCohetes;
+            cohetesTransferidos = transferidosAhora;
+        }
+
         if (barraCarga != null)
         {
             barraCarga.maxValue = cohetesPorCargador;
-            barraCarga.value = Mathf.Lerp(
-                cohetesRestantes,
+            barraCarga.value = Mathf.Min(
                 cohetesPorCargador,
-                progreso);
+                cohetesEnCargador +
+                (cohetesARecargar * progreso - cohetesTransferidos));
         }
 
+        ActualizarTextoMunicion();
+
         if (progreso >= 1f)
-        {
-            cohetesRestantes = cohetesPorCargador;
-            recargando = false;
-            ActualizarBarra();
+        {     recargando = false;
+            ActualizarUI();
         }
     }
 
-    private void ActualizarBarra()
+    public bool AgregarMunicion(int cantidad)
     {
-        if (barraCarga == null)
-            return;
+        if (cantidad <= 0 || cohetesDeReserva >= reservaMaxima)
+            return false;
 
-        barraCarga.maxValue = cohetesPorCargador;
-        barraCarga.value = cohetesRestantes;
+        int reservaAnterior = cohetesDeReserva;
+        cohetesDeReserva = Mathf.Min(
+            reservaMaxima,
+            cohetesDeReserva + cantidad);
+
+        ActualizarUI();
+        return cohetesDeReserva > reservaAnterior;
+    }
+
+    private void ActualizarUI()
+    {
+        if (barraCarga != null)
+        {
+            barraCarga.maxValue = cohetesPorCargador;
+            barraCarga.value = cohetesEnCargador;
+        }
+
+        ActualizarTextoMunicion();
+    }
+
+    private void ActualizarTextoMunicion()
+    {
+        if (textoMunicion != null)
+            textoMunicion.text =
+                $"{cohetesEnCargador} / {cohetesDeReserva}";
     }
 }

@@ -23,11 +23,11 @@ public class Enemigo : MonoBehaviour
 
     [Header("Jugador y detección")]
     [SerializeField] private Transform jugador;
-    [SerializeField] private float radioAlerta = 8f;
-    [SerializeField] private float radioPersecucion = 12f;
-    [SerializeField] private float anguloVision = 45f;
-    [SerializeField] private float distanciaDeteccionCercana = 1.5f;
-    [SerializeField] private float tiempoAlerta = 2f;
+    [SerializeField] private float radioAlerta = 18f;
+    [SerializeField] private float radioPersecucion = 25f;
+    [SerializeField] private float anguloVision = 60f;
+    [SerializeField] private float distanciaDeteccionCercana = 3f;
+    [SerializeField] private float tiempoAlerta = 3f;
     [SerializeField] private float alturaOjos = 1.4f;
 
     [Header("Persecución")]
@@ -36,12 +36,30 @@ public class Enemigo : MonoBehaviour
     [SerializeField] private float velocidadGiro = 6f;
 
     [Header("Arma invisible")]
-    [SerializeField] private float distanciaDisparo = 20f;
+    [SerializeField] private Transform puntoDisparo;
+    [SerializeField] private float distanciaDisparo = 60f;
     [SerializeField] private float danioJugador = 10f;
     [SerializeField] private float segundosEntreDisparos = 0.8f;
     [SerializeField] private int balasPorCargador = 5;
     [SerializeField] private float segundosRecarga = 2f;
+    [SerializeField] private float retrasoPrimerDisparo = 1.5f;
 
+    [Header("Sonido")]
+    [SerializeField] private GameObject prefabSonidoDisparo;
+    [SerializeField, Range(0f, 1f)] private float volumenDisparo = 1f;
+
+    [Header("Efectos visuales")]
+    [SerializeField] private GameObject efectoBocaArma;
+    [SerializeField] private GameObject efectoImpactoEnemigo;
+    [SerializeField] private float duracionEfectos = 2f;
+
+    [Header("Animación del arma")]
+    [SerializeField] private Transform armaVisual;
+    [SerializeField] private float distanciaRetroceso = 0.05f;
+    [SerializeField] private float anguloRetroceso = 4f;
+    [SerializeField] private float velocidadRetornoArma = 12f;
+
+    [Header("Estado")]
     [SerializeField]
     private EstadoEnemigo estadoActual =
         EstadoEnemigo.Patrullando;
@@ -55,35 +73,54 @@ public class Enemigo : MonoBehaviour
     private float alertaRestante;
     private float siguienteDisparo;
     private float finRecarga;
+    private float retrocesoActual;
 
     private bool esperando;
     private bool recargando;
 
+    private Vector3 posicionInicialArma;
+    private Quaternion rotacionInicialArma;
+
     private void Awake()
     {
         cuerpo = GetComponent<Rigidbody>();
-        cuerpo.constraints = RigidbodyConstraints.FreezeRotation;
+
+        // Mantiene el enemigo erguido y le permite girar sobre el eje Y.
+        cuerpo.constraints =
+            RigidbodyConstraints.FreezeRotationX |
+            RigidbodyConstraints.FreezeRotationZ;
+
         cuerpo.interpolation = RigidbodyInterpolation.Interpolate;
 
         vidaActual = vidaMaxima;
         balasRestantes = balasPorCargador;
 
-        if (barraVida != null)
+        ActualizarBarraVida();
+
+        if (armaVisual != null)
         {
-            barraVida.maxValue = vidaMaxima;
-            barraVida.value = vidaActual;
+            posicionInicialArma = armaVisual.localPosition;
+            rotacionInicialArma = armaVisual.localRotation;
         }
+        siguienteDisparo = Time.time + retrasoPrimerDisparo;
     }
 
     private void Update()
     {
+        ActualizarAnimacionArma();
+
         if (jugador == null)
             return;
 
         ActualizarEstado();
 
-        if (estadoActual == EstadoEnemigo.Persiguiendo)
+        // Puede disparar tanto al estar alerta como al perseguir,
+        // pero solo si ve al jugador y está dentro del alcance.
+        if (estadoActual == EstadoEnemigo.Alerta ||
+            estadoActual == EstadoEnemigo.Persiguiendo)
+        {
             IntentarDisparar();
+        }
     }
 
     private void FixedUpdate()
@@ -109,12 +146,14 @@ public class Enemigo : MonoBehaviour
     private void ActualizarEstado()
     {
         float distancia = Vector3.Distance(transform.position, jugador.position);
-        bool visible = distancia <= radioAlerta && JugadorVisible();
+        bool dentroDelRadioAlerta = distancia <= radioAlerta;
+        bool visible = JugadorVisible();
 
         switch (estadoActual)
         {
             case EstadoEnemigo.Patrullando:
-                if (visible)
+                // Nota al jugador al acercarse, incluso si aún hay una pared.
+                if (dentroDelRadioAlerta)
                 {
                     estadoActual = EstadoEnemigo.Alerta;
                     alertaRestante = tiempoAlerta;
@@ -122,11 +161,16 @@ public class Enemigo : MonoBehaviour
                 break;
 
             case EstadoEnemigo.Alerta:
-                if (visible)
+                if (visible && distancia <= radioPersecucion)
                 {
                     estadoActual = EstadoEnemigo.Persiguiendo;
                 }
-                else
+                else if (visible)
+                {
+                    // Si lo ve de lejos, permanece alerta y puede disparar.
+                    alertaRestante = tiempoAlerta;
+                }
+                else if (!dentroDelRadioAlerta)
                 {
                     alertaRestante -= Time.deltaTime;
 
@@ -136,7 +180,7 @@ public class Enemigo : MonoBehaviour
                 break;
 
             case EstadoEnemigo.Persiguiendo:
-                if (distancia > radioPersecucion || !JugadorVisible())
+                if (!visible || distancia > radioPersecucion)
                 {
                     estadoActual = EstadoEnemigo.Alerta;
                     alertaRestante = tiempoAlerta;
@@ -269,7 +313,7 @@ public class Enemigo : MonoBehaviour
     {
         float distancia = Vector3.Distance(transform.position, jugador.position);
 
-        if (distancia > distanciaAtaque || !JugadorVisible())
+        if (distancia > distanciaDisparo || !JugadorVisible())
             return;
 
         if (recargando)
@@ -296,37 +340,174 @@ public class Enemigo : MonoBehaviour
         balasRestantes--;
         siguienteDisparo = Time.time + segundosEntreDisparos;
 
-        Vector3 origen = transform.position + Vector3.up * alturaOjos;
+        Vector3 origen = puntoDisparo != null
+            ? puntoDisparo.position
+            : transform.position + Vector3.up * alturaOjos;
+
         Vector3 destino = jugador.position + Vector3.up;
         Vector3 direccion = (destino - origen).normalized;
 
-        if (Physics.Raycast(
+        ReproducirSonidoDisparo(origen);
+        CrearEfecto(
+            efectoBocaArma,
+            origen,
+            Quaternion.LookRotation(direccion));
+
+        // Busca el primer impacto que no pertenezca al propio enemigo.
+        RaycastHit[] impactos = Physics.RaycastAll(
             origen,
             direccion,
-            out RaycastHit impacto,
+           
             distanciaDisparo,
             ~0,
-            QueryTriggerInteraction.Ignore))
+            QueryTriggerInteraction.Ignore);
+
+        System.Array.Sort(
+            impactos,
+            (a, b) => a.distance.CompareTo(b.distance));
+
+        foreach (RaycastHit impacto in impactos)
         {
+            if (impacto.transform.root == transform.root)
+                continue;
+
+            CrearEfecto(
+                efectoImpactoEnemigo,
+                impacto.point,
+                Quaternion.LookRotation(impacto.normal));
+
             PlayerHealth vidaJugador =
                 impacto.collider.GetComponentInParent<PlayerHealth>();
 
             if (vidaJugador != null)
                 vidaJugador.TakeDamage(danioJugador);
+
+            // Se detiene en el primer objeto alcanzado.
+            break;
         }
+
+        retrocesoActual = 1f;
+    }
+
+    private void ReproducirSonidoDisparo(Vector3 posicion)
+    {
+        if (prefabSonidoDisparo == null)
+            return;
+
+        GameObject instancia = Instantiate(
+            prefabSonidoDisparo,
+            posicion,
+            Quaternion.identity);
+
+        AudioSource fuente =
+            instancia.GetComponentInChildren<AudioSource>();
+
+        if (fuente == null)
+        {
+            Debug.LogError(
+                "El prefab de sonido necesita un AudioSource.",
+                instancia);
+
+            Destroy(instancia);
+            return;
+        }
+
+        // Desactiva Play On Awake en el prefab para que no suene dos veces.
+        fuente.volume = volumenDisparo;
+        fuente.Play();
+
+        if (fuente.clip != null)
+        {
+            float duracion =
+                fuente.clip.length /
+                Mathf.Max(0.01f, Mathf.Abs(fuente.pitch));
+
+            Destroy(instancia, duracion + 0.2f);
+        }
+        else
+        {
+            Debug.LogWarning(
+                "El AudioSource del prefab no tiene un Audio Clip asignado.",
+                instancia);
+
+            Destroy(instancia, 5f);
+        }
+    }
+
+    private void CrearEfecto(
+        GameObject prefab,
+        Vector3 posicion,
+        Quaternion rotacion)
+    {
+        if (prefab == null)
+            return;
+
+        GameObject efecto = Instantiate(prefab, posicion, rotacion);
+        Destroy(efecto, duracionEfectos);
+    }
+
+    private void ActualizarAnimacionArma()
+    {
+        if (armaVisual == null)
+            return;
+
+        retrocesoActual = Mathf.MoveTowards(
+            retrocesoActual,
+            0f,
+            velocidadRetornoArma * Time.deltaTime);
+
+        Vector3 posicionObjetivo =
+            posicionInicialArma
+            + Vector3.back * (distanciaRetroceso * retrocesoActual);
+
+        Quaternion rotacionObjetivo =
+            rotacionInicialArma
+            * Quaternion.Euler(-anguloRetroceso * retrocesoActual, 0f, 0f);
+
+        armaVisual.localPosition = Vector3.Lerp(
+            armaVisual.localPosition,
+            posicionObjetivo,
+            velocidadRetornoArma * Time.deltaTime);
+
+        armaVisual.localRotation = Quaternion.Slerp(
+            armaVisual.localRotation,
+            rotacionObjetivo,
+            velocidadRetornoArma * Time.deltaTime);
     }
 
     public void RecibirDanio(float cantidad)
     {
+        RecibirDanio(cantidad, null);
+    }
+
+    public void RecibirDanio(float cantidad, Transform atacante)
+    {
         if (cantidad <= 0f || vidaActual <= 0f)
             return;
 
-        vidaActual = Mathf.Max(0f, vidaActual - cantidad);
+        // Registra al jugador y cancela la espera de patrulla.
+        if (atacante != null)
+        {
+            jugador = atacante.root;
+            esperando = false;
+            esperaRestante = 0f;
+            alertaRestante = tiempoAlerta;
+            estadoActual = EstadoEnemigo.Alerta;
+        }
 
-        if (barraVida != null)
-            barraVida.value = vidaActual;
+        vidaActual = Mathf.Max(0f, vidaActual - cantidad);
+        ActualizarBarraVida();
 
         if (vidaActual <= 0f)
             Destroy(gameObject);
+    }
+
+    private void ActualizarBarraVida()
+    {
+        if (barraVida == null)
+            return;
+
+        barraVida.maxValue = vidaMaxima;
+        barraVida.value = vidaActual;
     }
 }

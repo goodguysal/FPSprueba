@@ -9,11 +9,16 @@ public class PlayerHealth : MonoBehaviour
     [SerializeField] private float vidaMaxima = 100f;
     [SerializeField] private Slider barraVida;
 
+    [Header("Regeneración")]
+    [SerializeField] private float demoraRegeneracion = 4f;
+    [SerializeField] private float vidaRegeneradaPorSegundo = 5f;
+
     [Header("Muerte y reinicio")]
     [SerializeField] private GameObject pantallaMuerte;
     [SerializeField] private float retrasoReinicio = 3f;
 
     private float vidaActual;
+    private float tiempoDesdeDanio;
     private bool muerto;
 
     private void Start()
@@ -25,12 +30,30 @@ public class PlayerHealth : MonoBehaviour
             pantallaMuerte.SetActive(false);
     }
 
+    private void Update()
+    {
+        if (muerto || vidaActual >= vidaMaxima)
+            return;
+
+        tiempoDesdeDanio += Time.deltaTime;
+
+        if (tiempoDesdeDanio >= demoraRegeneracion)
+        {
+            vidaActual = Mathf.Min(
+                vidaMaxima,
+                vidaActual + vidaRegeneradaPorSegundo * Time.deltaTime);
+
+            ActualizarBarra();
+        }
+    }
+
     public void TakeDamage(float cantidad)
     {
         if (muerto || cantidad <= 0f)
             return;
 
         vidaActual = Mathf.Max(0f, vidaActual - cantidad);
+        tiempoDesdeDanio = 0f;
         ActualizarBarra();
 
         if (vidaActual <= 0f)
@@ -68,11 +91,17 @@ public class PlayerHealth : MonoBehaviour
         if (switcher != null)
             switcher.enabled = false;
 
-        foreach (WeaponController arma in GetComponentsInChildren<WeaponController>())
+        foreach (WeaponController arma in
+                 GetComponentsInChildren<WeaponController>(true))
+        {
             arma.enabled = false;
+        }
 
-        foreach (RocketLauncher arma in GetComponentsInChildren<RocketLauncher>())
+        foreach (RocketLauncher arma in
+                 GetComponentsInChildren<RocketLauncher>(true))
+        {
             arma.enabled = false;
+        }
 
         if (pantallaMuerte != null)
             pantallaMuerte.SetActive(true);
@@ -83,7 +112,6 @@ public class PlayerHealth : MonoBehaviour
         yield return new WaitForSecondsRealtime(retrasoReinicio);
 
         Time.timeScale = 1f;
-        Scene escenaActual = SceneManager.GetActiveScene();
-        SceneManager.LoadScene(escenaActual.buildIndex);
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

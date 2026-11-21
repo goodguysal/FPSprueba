@@ -8,6 +8,7 @@ public class WeaponSwitcher : MonoBehaviour
     {
         public GameObject objeto;
         public Behaviour[] controladores;
+        public GameObject interfaz;
     }
 
     [Header("Armas en orden de selección")]
@@ -36,8 +37,11 @@ public class WeaponSwitcher : MonoBehaviour
             if (armas[i].objeto == null)
                 continue;
 
-            posicionesIniciales[i] = armas[i].objeto.transform.localPosition;
-            renderers[i] = armas[i].objeto.GetComponentsInChildren<Renderer>(true);
+            posicionesIniciales[i] =
+                armas[i].objeto.transform.localPosition;
+
+            renderers[i] =
+                armas[i].objeto.GetComponentsInChildren<Renderer>(true);
         }
 
         MostrarArma(armaActual);
@@ -58,7 +62,8 @@ public class WeaponSwitcher : MonoBehaviour
 
     private void CambiarArma(int direccion)
     {
-        int siguiente = (armaActual + direccion + armas.Length) % armas.Length;
+        int siguiente =
+            (armaActual + direccion + armas.Length) % armas.Length;
 
         if (siguiente != armaActual)
             StartCoroutine(AnimarCambio(siguiente));
@@ -66,30 +71,47 @@ public class WeaponSwitcher : MonoBehaviour
 
     private IEnumerator AnimarCambio(int siguiente)
     {
+        if (armas[armaActual].objeto == null ||
+            armas[siguiente].objeto == null)
+        {
+            yield break;
+        }
+
         cambiando = true;
 
-        Transform armaVieja = armas[armaActual].objeto.transform;
-        Vector3 posicionInicial = posicionesIniciales[armaActual];
-        Vector3 posicionAbajo = posicionInicial + Vector3.down * distanciaBajada;
+        int anterior = armaActual;
+        Transform objetoAnterior = armas[anterior].objeto.transform;
+        Vector3 posicionAnterior = posicionesIniciales[anterior];
+        Vector3 posicionAnteriorAbajo =
+            posicionAnterior + Vector3.down * distanciaBajada;
 
-        ActivarControladores(armaActual, false);
+        ActivarControladores(anterior, false);
 
         yield return MoverArma(
-            armaVieja, posicionInicial, posicionAbajo, duracionBajada);
+            objetoAnterior,
+            posicionAnterior,
+            posicionAnteriorAbajo,
+            duracionBajada);
 
-        MostrarRenderers(armaActual, false);
+        MostrarRenderers(anterior, false);
+        MostrarInterfaz(anterior, false);
 
         armaActual = siguiente;
 
-        Transform armaNueva = armas[armaActual].objeto.transform;
+        Transform objetoNuevo = armas[armaActual].objeto.transform;
         Vector3 posicionNueva = posicionesIniciales[armaActual];
-        Vector3 posicionNuevaAbajo = posicionNueva + Vector3.down * distanciaBajada;
+        Vector3 posicionNuevaAbajo =
+            posicionNueva + Vector3.down * distanciaBajada;
 
-        armaNueva.localPosition = posicionNuevaAbajo;
+        objetoNuevo.localPosition = posicionNuevaAbajo;
         MostrarRenderers(armaActual, true);
+        MostrarInterfaz(armaActual, true);
 
         yield return MoverArma(
-            armaNueva, posicionNuevaAbajo, posicionNueva, duracionSubida);
+            objetoNuevo,
+            posicionNuevaAbajo,
+            posicionNueva,
+            duracionSubida);
 
         ActivarControladores(armaActual, true);
         cambiando = false;
@@ -106,6 +128,7 @@ public class WeaponSwitcher : MonoBehaviour
         while (transcurrido < duracion)
         {
             transcurrido += Time.deltaTime;
+
             float progreso = duracion > 0f
                 ? Mathf.Clamp01(transcurrido / duracion)
                 : 1f;
@@ -117,12 +140,14 @@ public class WeaponSwitcher : MonoBehaviour
         arma.localPosition = hasta;
     }
 
-    private void MostrarArma(int indice)
+    private void MostrarArma(int indiceSeleccionado)
     {
         for (int i = 0; i < armas.Length; i++)
         {
-            bool seleccionada = i == indice;
+            bool seleccionada = i == indiceSeleccionado;
+
             MostrarRenderers(i, seleccionada);
+            MostrarInterfaz(i, seleccionada);
             ActivarControladores(i, seleccionada);
 
             if (armas[i].objeto != null)
@@ -130,20 +155,29 @@ public class WeaponSwitcher : MonoBehaviour
         }
     }
 
+    private void MostrarInterfaz(int indice, bool mostrar)
+    {
+        if (armas[indice].interfaz != null)
+            armas[indice].interfaz.SetActive(mostrar);
+    }
+
     private void MostrarRenderers(int indice, bool mostrar)
     {
         if (renderers[indice] == null)
             return;
 
-        foreach (Renderer renderer in renderers[indice])
+        foreach (Renderer rendererArma in renderers[indice])
         {
-            if (renderer != null)
-                renderer.enabled = mostrar;
+            if (rendererArma != null)
+                rendererArma.enabled = mostrar;
         }
     }
 
     private void ActivarControladores(int indice, bool activar)
     {
+        if (armas[indice].controladores == null)
+            return;
+
         foreach (Behaviour controlador in armas[indice].controladores)
         {
             if (controlador != null)

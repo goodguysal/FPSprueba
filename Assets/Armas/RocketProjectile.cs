@@ -1,5 +1,5 @@
 using UnityEngine;
-
+using System.Collections.Generic;
 [RequireComponent(typeof(Collider))]
 [RequireComponent(typeof(Rigidbody))]
 public class RocketProjectile : MonoBehaviour
@@ -74,21 +74,50 @@ public class RocketProjectile : MonoBehaviour
         if (efectoExplosion != null)
             Instantiate(efectoExplosion, transform.position, Quaternion.identity);
 
-        Collider[] alcanzados = Physics.OverlapSphere(transform.position, radioExplosion);
+        Collider[] alcanzados =
+    Physics.OverlapSphere(transform.position, radioExplosion);
+
+        HashSet<Enemigo> enemigosDanados = new HashSet<Enemigo>();
 
         foreach (Collider objetivo in alcanzados)
         {
-            if (propietario != null && objetivo.transform.root.gameObject == propietario)
+            if (propietario != null &&
+                objetivo.transform.root.gameObject == propietario)
+            {
                 continue;
+            }
 
-            float distancia = Vector3.Distance(transform.position, objetivo.ClosestPoint(transform.position));
-            float factorDanio = 1f - Mathf.Clamp01(distancia / radioExplosion);
+            float distancia = Vector3.Distance(
+                transform.position,
+                objetivo.ClosestPoint(transform.position));
+
+            float factorDanio =
+                1f - Mathf.Clamp01(distancia / Mathf.Max(radioExplosion, 0.01f));
+
             float danio = danioMaximo * factorDanio;
 
-            objetivo.SendMessage(
-                "TakeDamage",
-                danio,
-                SendMessageOptions.DontRequireReceiver);
+            Enemigo enemigo =
+                objetivo.GetComponentInParent<Enemigo>();
+
+            if (enemigo != null)
+            {
+                // Evita aplicar daño varias veces si tiene varios colliders.
+                if (enemigosDanados.Add(enemigo))
+                {
+                    Transform atacante = propietario != null
+                        ? propietario.transform
+                        : null;
+
+                    enemigo.RecibirDanio(danio, atacante);
+                }
+            }
+            else
+            {
+                objetivo.SendMessage(
+                    "TakeDamage",
+                    danio,
+                    SendMessageOptions.DontRequireReceiver);
+            }
         }
 
         Destroy(gameObject);
